@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Age Calculator</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --accent:#60a5fa; --muted:#94a3b8; --text:#e6eef8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+    background:linear-gradient(180deg,#071228 0%, #0b1624 100%);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:760px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid rgba(255,255,255,0.04);
+    border-radius:12px;
+    padding:20px;
+    box-shadow:0 8px 30px rgba(2,6,23,0.6);
+  }
+  h1{font-size:20px;margin:0 0 8px}
+  p.lead{color:var(--muted);margin:0 0 18px;font-size:13px}
+  .row{
+    display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;
+  }
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+  input[type="date"]{
+    padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);
+    background:transparent;color:var(--text);min-width:190px;
+  }
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  button{
+    background:var(--accent);border:none;color:#02223b;padding:10px 14px;border-radius:8px;
+    cursor:pointer;font-weight:600;
+  }
+  button.secondary{
+    background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--text);
+  }
+  .result{
+    margin-top:18px;padding:14px;border-radius:10px;background:linear-gradient(180deg, rgba(96,165,250,0.06), rgba(96,165,250,0.02));
+    border:1px solid rgba(96,165,250,0.08);
+  }
+  .grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;
+  }
+  .stat{
+    padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;
+  }
+  .stat .n{font-size:20px;font-weight:700;color:var(--text)}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:6px}
+  .error{color:#ffb4a2;background:rgba(255,80,60,0.06);padding:8px;border-radius:8px;margin-top:12px;border:1px solid rgba(255,80,60,0.08)}
+  footer{margin-top:14px;color:var(--muted);font-size:12px;text-align:right}
+  @media (max-width:420px){
+    input[type="date"]{min-width:100%}
+    .actions{width:100%}
+    button{width:100%}
+  }
+</style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="calc-title">
+    <h1 id="calc-title">Age Calculator</h1>
+    <p class="lead">Enter your date of birth to calculate your age (years, months, days). Works offline — no data leaves your browser.</p>
+
+    <form id="ageForm" onsubmit="return false" aria-describedby="instructions">
+      <div class="row" id="inputs">
+        <div>
+          <label for="dob">Date of Birth</label>
+          <input id="dob" name="dob" type="date" aria-required="true" />
+        </div>
+
+        <div class="actions" aria-hidden="false">
+          <button id="calcBtn" type="button">Calculate</button>
+          <button id="clearBtn" type="button" class="secondary">Clear</button>
+        </div>
+      </div>
+
+      <div id="error" role="status" aria-live="polite"></div>
+
+      <div id="output" class="result" hidden aria-live="polite">
+        <div class="grid">
+          <div class="stat"><div class="n" id="years">0</div><div class="l">Years</div></div>
+          <div class="stat"><div class="n" id="months">0</div><div class="l">Months</div></div>
+          <div class="stat"><div class="n" id="days">0</div><div class="l">Days</div></div>
+          <div class="stat"><div class="n" id="totalMonths">0</div><div class="l">Total Months (approx)</div></div>
+          <div class="stat"><div class="n" id="totalDays">0</div><div class="l">Total Days</div></div>
+        </div>
+        <footer id="computedOn">Calculated on: —</footer>
+      </div>
+    </form>
+  </main>
+
+<script>
+(function(){
+  const dobInput = document.getElementById('dob');
+  const calcBtn = document.getElementById('calcBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const errorDiv = document.getElementById('error');
+  const output = document.getElementById('output');
+  const yearsEl = document.getElementById('years');
+  const monthsEl = document.getElementById('months');
+  const daysEl = document.getElementById('days');
+  const totalMonthsEl = document.getElementById('totalMonths');
+  const totalDaysEl = document.getElementById('totalDays');
+  const computedOn = document.getElementById('computedOn');
+
+  function clearError(){
+    errorDiv.innerHTML='';
+    errorDiv.className='';
+  }
+
+  function showError(msg){
+    errorDiv.textContent = msg;
+    errorDiv.className = 'error';
+    output.hidden = true;
+  }
+
+  function daysInMonth(year, monthIndex){ // monthIndex 0-11
+    return new Date(year, monthIndex+1, 0).getDate();
+  }
+
+  function calculateAge(birthDate, nowDate){
+    // Start with simple differences
+    let by = birthDate.getFullYear();
+    let bm = birthDate.getMonth(); // 0-11
+    let bd = birthDate.getDate();
+
+    let ny = nowDate.getFullYear();
+    let nm = nowDate.getMonth();
+    let nd = nowDate.getDate();
+
+    let years = ny - by;
+    let months = nm - bm;
+    let days = nd - bd;
+
+    // Borrow days if needed
+    if (days < 0){
+      // borrow from previous month of 'nowDate'
+      let prevMonthIndex = nm - 1;
+      let prevYear = ny;
+      if (prevMonthIndex < 0){ prevMonthIndex = 11; prevYear = ny - 1; }
+      const borrowDays = daysInMonth(prevYear, prevMonthIndex);
+      days += borrowDays;
+      months -= 1;
+    }
+
+    // Borrow months if needed
+    if (months < 0){
+      months += 12;
+      years -= 1;
+    }
+
+    // Total months approximated (years*12 + months)
+    const totalMonths = years * 12 + months;
+    // Total days exact difference (ms -> days)
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const totalDays = Math.floor((nowDate - birthDate) / msPerDay);
+
+    return {years, months, days, totalMonths, totalDays};
+  }
+
+  calcBtn.addEventListener('click', function(){
+    clearError();
+    const val = dobInput.value;
+    if (!val){
+      showError('Please choose a valid date of birth.');
+      return;
+    }
+
+    const birth = new Date(val + 'T00:00:00'); // treat as local midnight
+    const now = new Date();
+    // Remove time parts from now to make difference consistent
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (birth > today){
+      showError('Date of birth cannot be in the future. Please pick a valid date.');
+      return;
+    }
+
+    // Safety: unrealistic old ages
+    const ageYears = today.getFullYear() - birth.getFullYear();
+    if (ageYears > 150){
+      showError('Entered date seems too far in the past. If this is correct, proceed — otherwise check the date.');
+      // we allow the calculation to continue if user wants, so don't return
+    }
+
+    const res = calculateAge(birth, today);
+    yearsEl.textContent = res.years;
+    monthsEl.textContent = res.months;
+    daysEl.textContent = res.days;
+    totalMonthsEl.textContent = res.totalMonths;
+    totalDaysEl.textContent = res.totalDays.toLocaleString();
+
+    const opts = {year:'numeric', month:'short', day:'numeric'};
+    computedOn.textContent = 'Calculated on: ' + today.toLocaleDateString(undefined, opts);
+
+    output.hidden = false;
+  });
+
+  clearBtn.addEventListener('click', function(){
+    dobInput.value = '';
+    output.hidden = true;
+    clearError();
+  });
+
+  // UX: set max to today so user can't easily pick future date (but still validate)
+  const todayISO = new Date().toISOString().slice(0,10);
+  dobInput.setAttribute('max', todayISO);
+
+  // keyboard: enter triggers calculate
+  dobInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); calcBtn.click(); }
+  });
+
+})();
+</script>
+</body>
+</html>
